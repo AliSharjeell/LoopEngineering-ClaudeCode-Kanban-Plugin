@@ -17,32 +17,47 @@
 
 ---
 
-## Install globally (one-time, works in every project)
+## Install globally + scaffold current project (one-time)
 
-Paste this into Claude Code to install Loop Engineering as a global skill — available in every project, no per-repo scaffold needed:
+Paste this into Claude Code from inside the project you want Loop Engineering to run in. It installs the slash command globally (works in every project) AND scaffolds the state files (`TODO.md`, `INPROGRESS.md`, `DONE.md`, `QUARANTINED.md`) plus the local `.claude/commands/loop-tasks.md` in the current folder:
 
 ```text
-Install Loop Engineering as a global Claude Code skill. The source repo is https://github.com/AliSharjeell/LoopEngineering-ClaudeCode-Kanban-Plugin. Steps:
+Install Loop Engineering as a global Claude Code skill AND scaffold the state files in the current project folder. The source repo is https://github.com/AliSharjeell/LoopEngineering-ClaudeCode-Kanban-Plugin. The project folder is PROJECT_DIR=$(pwd) — the loop will run inside it.
 
 1. Clone the repo to a temp directory:
    rm -rf /tmp/loop-engineering
    git clone https://github.com/AliSharjeell/LoopEngineering-ClaudeCode-Kanban-Plugin.git /tmp/loop-engineering
 
-2. Copy the slash command and skill entry to global paths:
+2. Install the slash command and skill entry globally:
    mkdir -p ~/.claude/skills/loop-tasks
    cp /tmp/loop-engineering/.claude/commands/loop-tasks.md ~/.claude/commands/loop-tasks.md
    cp /tmp/loop-engineering/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
 
-3. Copy the assets:
+3. Copy the assets globally:
    mkdir -p ~/.claude/loop-engineering
    cp -r /tmp/loop-engineering/assets ~/.claude/loop-engineering/
 
-4. Clean up the temp clone:
+4. Scaffold the state files and slash command in PROJECT_DIR (the folder you're running this prompt from):
+   mkdir -p "$PROJECT_DIR/.claude/commands"
+   cp /tmp/loop-engineering/.claude/commands/loop-tasks.md "$PROJECT_DIR/.claude/commands/loop-tasks.md"
+   cp /tmp/loop-engineering/TODO.md        "$PROJECT_DIR/TODO.md"
+   cp /tmp/loop-engineering/INPROGRESS.md  "$PROJECT_DIR/INPROGRESS.md"
+   cp /tmp/loop-engineering/QUARANTINED.md "$PROJECT_DIR/QUARANTINED.md"
+   # DONE.md is written fresh (the source repo file is misnamed DONE.MD; the slash command reads DONE.md lowercase).
+   cat > "$PROJECT_DIR/DONE.md" <<'DONE_EOF'
+# Done
+
+> Verified and completed tasks. Each entry has cleared both Gate 1 (subagent self-verify) and Gate 2 (supervisor re-verify) and has been committed to git.
+DONE_EOF
+
+5. Clean up the temp clone:
    rm -rf /tmp/loop-engineering
 
-5. Verify with: ls ~/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
+6. Verify with:
+   ls ~/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
+   ls "$PROJECT_DIR/.claude/commands/loop-tasks.md" "$PROJECT_DIR/TODO.md" "$PROJECT_DIR/INPROGRESS.md" "$PROJECT_DIR/DONE.md" "$PROJECT_DIR/QUARANTINED.md"
 
-After install, /loop-tasks works in every project. To update, re-run these steps.
+After install, /loop-tasks works in every project. To update, re-run these steps. The current project at PROJECT_DIR is now ready — add tasks to PROJECT_DIR/TODO.md and run /loop 2m /loop-tasks from inside it.
 ```
 
 ## What it does
