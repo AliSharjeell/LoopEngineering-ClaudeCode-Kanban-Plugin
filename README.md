@@ -346,6 +346,99 @@ See `PLAN.md` section 9 for the full list.
 
 ---
 
+## Inner loop (the "reprompt if wrong" mechanic)
+
+When a subagent's work fails Gate 1 or Gate 2, the supervisor does NOT kick the task back to the backlog for a fresh subagent on the next tick. Instead, it runs an **inner loop** within the same tick, up to `MaxAttempts` times (default 3).
+
+Each retry spawns a **continuation agent** whose prompt carries:
+
+- The full task description and verification statement.
+- The previous attempt's failure evidence (Gate 1 or Gate 2 output).
+- The previous attempt's edits still in the working tree (`git diff`).
+- An explicit **dirty-tree warning**: do not recreate files, apply targeted patches.
+
+This means a task that fails on attempt 1 doesn't pay the full cost of:
+- A new tick of waiting
+- A new subagent discovering the codebase from scratch
+- Losing the partial work already in the working tree
+
+The inner loop only fires on failures. Tasks that pass first try go straight through with no spawn overhead.
+
+### Tuning MaxAttempts per task
+
+```markdown
+- [ ] Task: Write Jest tests for the auth flow
+  Verification: `npx jest auth.test.js` exits 0
+  MaxAttempts: 5             # default would be 3
+  Depends On: none
+```
+
+Use 1 for trivial mechanical edits (renames, formatting). Use 5+ for genuinely brittle work — IPC routing, codegen, build-system tweaks where the model needs several tries to nail the syntax.
+
+### Terminal failure: QUARANTINED.md
+
+When the inner loop exhausts `MaxAttempts` without passing both gates, the task is moved to `QUARANTINED.md` — a strictly terminal state. The supervisor will never re-dispatch a quarantined task. Recovery requires a human:
+
+1. Read the attempt history in `QUARANTINED.md` to diagnose.
+2. Clean the dirty working tree (`git checkout -- <files>` or `git stash`).
+3. Move the task back to `TODO.md` with a `[RETRY]` prefix and a possibly rewritten verification.
+4. Commit the recovery.
+
+See `QUARANTINED.md` for the full recovery procedure.
+
+---
+
+## Multi-modal verification
+
+For visual or architectural work that a bash command can't capture (Linear-style UI components, WebGL shaders, design system conformance), use `Verification-LLM:` instead of `Verification:`:
+
+```markdown
+- [ ] Task: Refactor the dashboard sidebar
+  Verification-LLM: Diff must show: (1) 12px font with reduced contrast, (2) collapse-to-icon at <768px, (3) ARIA labels on all interactive elements. Reject if any check missing.
+  Depends On: none
+```
+
+At Gate 2 the supervisor spawns a read-only LLM judge subagent with the diff and the rubric, and demands `VERDICT: PASS|FAIL` with a citation. You can also combine both — bash first, LLM second — for tasks that need both runnable and judgment-based verification.
+
+LLM judgments cost more than bash. The tick summary reports how many LLM judgments ran that tick and warns above 5. Trust the schema, watch the budget.
+
+---
+
+## Complex tickets: when to use GSD instead
+
+LoopEngineering is a **factory line for execution**. It assumes tasks are well-shaped: clear `Verification:`, concrete `Depends On:`, scope under 15 minutes.
+
+If you have an Epic like "Build user authentication," do NOT drop it into `TODO.md` and hope. The inner loop will quarantine it on attempt 3 with "task too vague."
+
+Instead, use a planner upstream:
+
+1. Run `/gsd:plan-phase <n>` — produces a roadmap of micro-tasks with dependencies.
+2. Translate those micro-tasks into LoopEngineering task blocks (each with `Verification:` and `Depends On:`).
+3. Drop them into `TODO.md` and start `/loop 2m /loop-tasks`.
+
+LoopEngineering handles the execution queue. External planners handle decomposition. Keep the architecture strictly bounded to execution.
+
+---
+
+## File layout (updated)
+
+```
+LoopEngineering/
+├── .claude/
+│   └── commands/
+│       └── loop-tasks.md     # the /loop-tasks slash command (with inner loop)
+├── .gitignore                # OS/editor/build exclusions
+├── HOW-IT-WORKS.md           # technical deep-dive of the system
+├── PLAN.md                   # architecture + design rationale
+├── QUARANTINED.md            # terminal failure state (supervisor-owned)
+├── README.md                 # this file
+├── TODO.md                   # pending tasks (your input)
+├── INPROGRESS.md             # active tasks (supervisor-owned)
+└── DONE.md                   # verified completed tasks (auto-archived)
+```
+
+---
+
 ## License
 
 MIT. Use it, fork it, ship it.
