@@ -1,6 +1,6 @@
 # Loop Engineering — Claude Code Kanban Plugin
 
-![LoopEngineering architecture: Claude Code session invokes a 6-phase supervisor every 2 minutes — Stale Recovery, Classification, Dispatch, Dual-Gate Audit, and Tick Summary](assets/architecture.png)
+![LoopEngineering Orchestrator: 6-phase tick (Stale Recovery → Classification → Dispatch → Dual-Gate Audit → Commits → Tick Summary) running inside Claude Code every 2 minutes, with persistent state files (TODO/INPROGRESS/DONE/QUARANTINED), failure-mode coverage, isolated subagent sandbox, dual-gate audit (Bash + LLM judge), and tick failure recovery](assets/architecturenew.png)
 
 **An autonomous, self-healing Kanban loop for Claude Code.** Drop tasks in markdown. Walk away. Watch verified work commit itself to git.
 
