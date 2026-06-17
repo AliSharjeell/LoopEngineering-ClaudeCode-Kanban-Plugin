@@ -22,16 +22,27 @@
 Paste this into Claude Code to install Loop Engineering as a global skill — available in every project, no per-repo scaffold needed:
 
 ```text
-Install Loop Engineering as a global Claude Code skill. Steps:
+Install Loop Engineering as a global Claude Code skill. The source repo is https://github.com/AliSharjeell/LoopEngineering-ClaudeCode-Kanban-Plugin. Steps:
 
-1. mkdir -p ~/.claude/skills/loop-tasks
-2. cp .claude/commands/loop-tasks.md ~/.claude/commands/loop-tasks.md
-3. cp .claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
-4. mkdir -p ~/.claude/loop-engineering && cp -r assets ~/.claude/loop-engineering/
+1. Clone the repo to a temp directory:
+   rm -rf /tmp/loop-engineering
+   git clone https://github.com/AliSharjeell/LoopEngineering-ClaudeCode-Kanban-Plugin.git /tmp/loop-engineering
 
-Verify with: ls ~/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
+2. Copy the slash command and skill entry to global paths:
+   mkdir -p ~/.claude/skills/loop-tasks
+   cp /tmp/loop-engineering/.claude/commands/loop-tasks.md ~/.claude/commands/loop-tasks.md
+   cp /tmp/loop-engineering/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
 
-After install, /loop-tasks works in every project. To update, re-run these steps from a fresh clone of this repo.
+3. Copy the assets:
+   mkdir -p ~/.claude/loop-engineering
+   cp -r /tmp/loop-engineering/assets ~/.claude/loop-engineering/
+
+4. Clean up the temp clone:
+   rm -rf /tmp/loop-engineering
+
+5. Verify with: ls ~/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
+
+After install, /loop-tasks works in every project. To update, re-run these steps.
 ```
 
 ## What it does
