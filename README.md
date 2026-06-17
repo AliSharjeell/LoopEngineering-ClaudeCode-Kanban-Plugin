@@ -1,7 +1,9 @@
-# Loop Engineering Claude Code Kanban Plugin
+# Loop Engineering — Claude Code Kanban Plugin
 
 ![LoopEngineering architecture: Claude Code session invokes a 6-phase supervisor every 2 minutes — Stale Recovery, Classification, Dispatch, Dual-Gate Audit, and Tick Summary](assets/architecture.png)
-An autonomous, self-healing Kanban loop for Claude Code. Drop tasks in markdown. Walk away. Watch verified work commit itself to git.
+
+**An autonomous, self-healing Kanban loop for Claude Code.** Drop tasks in markdown. Walk away. Watch verified work commit itself to git.
+
 ```
    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
    │   TODO.md   │ -> │ INPROGRESS   │ -> │   DONE.md   │
@@ -15,111 +17,70 @@ An autonomous, self-healing Kanban loop for Claude Code. Drop tasks in markdown.
 
 ---
 
-## About
+## What it does
 
-**LoopEngineering is a Claude Code plugin that turns `/loop` into an autonomous, self-healing task supervisor.**
+Loop Engineering turns Claude Code's `/loop` into a verified task factory:
 
-Drop a list of tasks into `TODO.md` — each with a description, a verification statement, and its dependencies — then run:
+- You write tasks in `TODO.md` with a clear description and a testable verification.
+- Every 2 minutes, a supervisor reads your backlog, dispatches ready tasks to isolated subagents, verifies their work through two independent gates, commits verified work to git, and recovers any task whose subagent crashed.
+- It runs forever. You stop it with `Ctrl+C`. State lives on disk in three markdown files.
 
-```
-/loop 2m /loop-tasks
-```
-
-…and walk away. The plugin wakes up every 2 minutes, dispatches ready tasks to isolated subagents, verifies their work through two independent gates, commits verified tasks to git, and recovers automatically from any subagent that crashes or hangs.
-
-**What you get out of the box:**
-
-- A custom slash command (`/loop-tasks`) that runs the 6-phase supervisor
-- A strict markdown task schema (Task / Verification / Depends On)
-- A 3-file Kanban board on disk (TODO / INPROGRESS / DONE) — fully recoverable
-- A 10-minute stale-task recovery system — no more stuck queues
-- A dual-gate verification protocol — subagent self-check + supervisor re-check
-- Automatic git commits per verified task — your `git log` becomes the audit trail
-
-**Who it's for:** developers using Claude Code who want to batch up a list of work and let the agent grind through it without babysitting every step.
-
----
-
-## What it is
-
-LoopEngineering is a six-phase state machine wrapped around Claude Code's `/loop` command. It turns this:
-
-```
-/loop 2m do my tasks
-```
-
-...into a hardened supervisor that re-reads its instructions fresh on every tick, dispatches isolated subagents, verifies their work through two independent gates, recovers from crashes automatically, and commits each verified task to git.
-
-The whole system is plain text: three markdown files, one slash command, one git repo. No servers. No frameworks. No external services.
-
----
-
-## Why
-
-A bare `/loop` prompt breaks down within a few iterations. Agents hallucinate, drop constraints, skip verification, and leave half-done work stuck in limbo. LoopEngineering fixes each of those failure modes:
-
-| Failure mode                  | Fix                                     |
-|-------------------------------|-----------------------------------------|
-| Agent forgets its own rules   | Slash command re-reads instructions fresh every tick |
-| No verification               | Two-gate audit (subagent + supervisor)  |
-| Crashed subagent bricks queue | 10-minute stale recovery, auto-retry    |
-| Lost context across ticks     | State on disk in markdown, not in chat  |
-| Bad commit breaks the project | Git checkpoint only after Gate 2 passes |
+That's the whole system. No servers. No daemons. No frameworks. One slash command + three state files + git.
 
 ---
 
 ## Quick start
 
 ```bash
-# 1. Make sure you're in the repo root
-cd LoopEngineering
+# 1. Initialize git in your project (the safety net)
+cd my-project
+git init && git add . && git commit -m "initial"
 
-# 2. Confirm git is initialized
-git status
+# 2. Copy the LoopEngineering scaffold
+cp -r path/to/LoopEngineering/.claude ./
+cp -r path/to/LoopEngineering/assets ./
 
-# 3. Confirm the slash command is registered
-#    (open Claude Code, type / in the prompt, look for /loop-tasks)
+# 3. Open Claude Code in the project
+claude
 
-# 4. Add a task to TODO.md
-#    (use the schema in section "Task schema" below)
+# 4. Confirm /loop-tasks appears in the slash menu (type / to check)
 
-# 5. Start the loop
+# 5. Add a task to TODO.md (use the schema in "Task schema" below)
+
+# 6. Start the loop
 /loop 2m /loop-tasks
 ```
 
-That's it. Every two minutes, the supervisor wakes up, processes the backlog, verifies the work, and commits verified tasks to git.
+Every two minutes the supervisor wakes up, processes your backlog, verifies the work, and commits verified tasks to git. Watch the terminal for the tick summary.
 
 ---
 
 ## How to use
 
-A practical walkthrough for running the loop day to day.
+This is the reference for every workflow the loop supports.
 
-### First-time setup
-
-Once per project:
+### First-time setup (once per project)
 
 ```bash
-# 1. Copy this scaffold into your project root (or work in this repo)
-cp -r LoopEngineering/ /path/to/your/project/
+# Copy the scaffold
+cp -r path/to/LoopEngineering/.claude my-project/
+cp -r path/to/LoopEngineering/assets my-project/
 
-# 2. Initialize git (the safety net)
-cd /path/to/your/project
+# Initialize git
+cd my-project
 git init
 git add .
 git commit -m "chore: add LoopEngineering scaffold"
 
-# 3. Open Claude Code in the project
+# Open Claude Code
 claude
-
-# 4. Type / in an empty prompt. Confirm /loop-tasks appears in the menu.
 ```
 
-If `/loop-tasks` is not listed, check that `.claude/commands/loop-tasks.md` exists at the project root and restart Claude Code.
+In Claude Code, type `/` in an empty prompt. You should see `/loop-tasks` in the menu. If you don't, check that `.claude/commands/loop-tasks.md` exists at the project root and restart Claude Code.
 
-### Your first tick
+### Your first task
 
-Open `TODO.md` and add one task:
+Add this to `TODO.md`:
 
 ```markdown
 - [ ] Task: Add a hello-world script
@@ -127,7 +88,7 @@ Open `TODO.md` and add one task:
   Depends On: none
 ```
 
-In your Claude Code terminal:
+Then in Claude Code:
 
 ```
 /loop 2m /loop-tasks
@@ -135,13 +96,13 @@ In your Claude Code terminal:
 
 Wait two minutes. The supervisor will:
 
-1. Read `TODO.md` and find your task.
-2. Move it to `INPROGRESS.md` and stamp the start time.
+1. Find your task in `TODO.md`.
+2. Move it to `INPROGRESS.md` with a `Started:` timestamp.
 3. Spawn a subagent to write `hello.js`.
 4. Re-run `node hello.js` itself for Gate 2 verification.
 5. Move the task to `DONE.md` and commit to git.
 
-You will see a tick summary like this:
+You'll see a tick summary like:
 
 ```
 ── Tick @ 2026-06-17T12:34:56Z ──
@@ -152,84 +113,222 @@ You will see a tick summary like this:
   Backlog: 0
 ```
 
+### Adding more work
+
+Drop new tasks into `TODO.md` at any time. The loop picks them up on the next tick. See **Task schema** below for the full format with examples.
+
 ### Reading the tick summary
 
 | Field | Meaning |
 |-------|---------|
 | `Promoted to DONE` | Tasks that passed both gates and are now in `DONE.md`. |
-| `Still In Progress` | Tasks a subagent is currently working on (or the supervisor is verifying). |
+| `Still In Progress` | Tasks a subagent is currently working on (or verifying). |
 | `Blocked` | Tasks whose `Depends On:` chain is not yet complete. The loop will not touch them. |
-| `Recovered (stale)` | Tasks that exceeded the 10-minute timeout and were sent back to `TODO.md` as `[RETRY]`. |
+| `Recovered (stale)` | Tasks that exceeded the 15-minute timeout and were sent back to `TODO.md` as `[RETRY]`. |
 | `Backlog` | Total tasks remaining in `TODO.md`. |
 
-### Common operations
+### Visual / image-based tasks
 
-**Edit a task that is in progress:** don't. Move it back to `TODO.md` first (remove the `[RETRY]` prefix and `Fail Reason:` line), then edit it there.
+For UI work, mockup fidelity, or design-system conformance, attach an image to the verification. Subagents and the supervisor's LLM judge can read images via the `Read` tool.
 
-**Skip a task for now:** add `[SKIP]` to its first line. The supervisor will leave it alone. Remove `[SKIP]` when you want it picked up.
-
-**Force-retry a stuck task:** remove it from `INPROGRESS.md` and put it back at the top of `TODO.md` with the `[RETRY]` prefix removed.
-
-**Revert a bad commit:**
-```bash
-git reset --hard HEAD~1
+```markdown
+- [ ] Task: Refactor the dashboard hero to match the v2 mockup
+  Verification-LLM: Read both `git diff HEAD` and the mockup at `assets/mockups/dashboard-hero-v2.png`. The implementation must match: (1) headline top-left with 48px margin, (2) CTA at bottom-right with primary brand color, (3) gradient stops at the mockup's angles. Reject if any visual mismatch is obvious.
+  Depends On: none
 ```
-The state files roll back too. Move the affected task back to `INPROGRESS.md` manually if you want to retry it.
 
-**Stop the loop:** press `Ctrl+C` in the terminal where `/loop` is running. State is on disk, so nothing is lost. Re-run `/loop 2m /loop-tasks` to resume.
+Put reference images in `assets/mockups/`, baselines in `assets/baselines/`, references in `assets/references/`, brand assets in `assets/brand/`. Track them in git — they're the source of truth that verifications depend on.
 
-**Change the cadence:** `/loop 5m /loop-tasks` for every 5 minutes, `/loop 30s /loop-tasks` for every 30 seconds. Shorter intervals are more responsive but burn more context.
+For cheap "is the file on disk" checks, use bash instead:
 
-### Adding more work
+```markdown
+- [ ] Task: Add the dashboard hero illustration
+  Verification: `test -f assets/illustrations/hero.svg && file assets/illustrations/hero.svg | grep -q "SVG"` exits 0
+  Depends On: none
+```
 
-Drop new tasks into `TODO.md` at any time. The loop picks them up on the next tick. Write each one with a concrete, testable `Verification:` — see the schema below for examples of good vs. bad verifications.
+### Tasks that need judgment (LLM verification)
+
+For architectural or aesthetic work that bash can't capture, use `Verification-LLM:` instead of `Verification:`. The supervisor spawns a read-only LLM judge to evaluate the diff against your rubric.
+
+```markdown
+- [ ] Task: Refactor the dashboard sidebar to a Linear-style minimalist hierarchy
+  Verification-LLM: Read the diff. The sidebar must: (1) use 12px font with reduced contrast for secondary items, (2) collapse to icon-only at <768px viewport, (3) include ARIA labels on all interactive elements. Reject if any check is missing.
+  Depends On: none
+```
+
+You can combine both: a bash check **and** an LLM rubric. Both must pass.
+
+### Tasks that might loop forever (and how to cap them)
+
+The default is **unlimited retries**. If Gate 2 fails, the supervisor retries within the same tick — over and over, until it passes or you `Ctrl+C`. The dirty working tree is preserved across attempts so a continuation agent can build on prior work instead of starting from scratch.
+
+Set `MaxAttempts: N` only when you need a hard ceiling:
+
+```markdown
+- [ ] Task: Wire up the Stripe webhook handler
+  Verification: `node scripts/test-webhook.js` exits 0
+  MaxAttempts: 8             # cap retries — webhook routing can flake
+  Depends On: none
+```
+
+Use a cap when:
+- You suspect the task is structurally unsolvable (bad verification, missing dep).
+- Runaway token cost is unacceptable.
+- The retry budget itself is part of the semantics ("give the model exactly 3 tries").
+
+For everything else, leave it uncapped. It loops — that's the point.
+
+### Tasks that get stuck (quarantine)
+
+When a task exhausts its `MaxAttempts` cap without passing both gates, the supervisor moves it to `QUARANTINED.md` — a terminal state. The loop will never re-dispatch it.
+
+To recover a quarantined task:
+
+1. Read the attempt history in `QUARANTINED.md` to diagnose.
+2. Clean the dirty working tree: `git checkout -- <files>` or `git stash`.
+3. Move the task back to `TODO.md` with a `[RETRY]` prefix and (optionally) a rewritten verification.
+4. Commit the recovery.
+
+The `[RETRY]` prefix tells the supervisor to throttle the task — skip it for 2 ticks to prevent thrashing.
+
+### Complex epics (use GSD first)
+
+Loop Engineering is a factory line for execution. It assumes tasks are well-shaped: clear verification, concrete dependencies, scope under 15 minutes.
+
+If you have an epic like "Build user authentication," do NOT drop it into `TODO.md`. The loop will get stuck.
+
+Instead:
+
+1. Use a planner (e.g., `/gsd:plan-phase <n>`) to decompose the epic into micro-tasks.
+2. Translate those micro-tasks into Loop Engineering task blocks.
+3. Drop them into `TODO.md` and start `/loop 2m /loop-tasks`.
+
+The loop handles execution. External planners handle decomposition.
+
+### Auto-generating TODO.md with Claude Code
+
+Don't hand-write every task. Ask Claude Code to read your spec, codebase, or mockup and produce a well-shaped `TODO.md`.
+
+From a spec doc:
+```
+Read SPEC.md and produce TODO.md with 8-15 tasks that fully implement it.
+Follow the schema at the top of TODO.md exactly. Each task needs a
+binary Verification. Order tasks as a DAG: foundation → features → polish.
+```
+
+From an existing codebase:
+```
+Look at this repo and produce TODO.md with 5-10 tasks that would
+meaningfully improve it (missing tests, TODO comments, lint warnings,
+deprecation notices). Reference specific file paths in each Task:.
+```
+
+From a design mockup:
+```
+Look at assets/mockups/main.png and produce TODO.md with the
+implementation tasks needed to build it. Use Verification-LLM: with
+rubric referencing the mockup for any primarily-visual task.
+```
+
+Then iterate: "Reorder so auth tasks come before dashboard tasks. Rewrite the verification for X to test success not just rendering. Split Y into 3 smaller tasks."
+
+### Daily operations
+
+| You want to... | Do this |
+|----------------|---------|
+| Edit a task that's running | Move it back to `TODO.md` first, edit there. Never edit `INPROGRESS.md` by hand. |
+| Skip a task for now | Add `[SKIP]` to the `Task:` line. Remove it to re-enable. |
+| Force-retry a stuck task | Remove from `INPROGRESS.md`, put back at the top of `TODO.md` with the `[RETRY]` prefix removed. |
+| Revert a bad commit | `git reset --hard HEAD~1`. State files roll back too. |
+| Stop the loop | `Ctrl+C` in the terminal where `/loop` is running. State is on disk; nothing is lost. |
+| Resume the loop | Re-run `/loop 2m /loop-tasks`. |
+| Change the cadence | `/loop 5m /loop-tasks` (every 5 min) or `/loop 30s /loop-tasks` (every 30s). |
+| Change the stale timeout | Edit `.claude/commands/loop-tasks.md`, find `> 15 minutes`, change it. |
 
 ---
 
-## How it works
+## Architecture
 
-Every 2 minutes the loop runs six phases, in order:
-
-### Phase 1 — Stale Recovery (Janitor)
-Sweeps `INPROGRESS.md`. Any task with a `Started:` timestamp older than 10 minutes is yanked out, marked `[RETRY]`, and pushed back to `TODO.md` with a `Fail Reason:`. Crashed subagents are healed automatically.
-
-### Phase 2-3 — Classification (Strategist)
-Parses `TODO.md`. For every task, checks `Depends On:` against `DONE.md`. Labels each task **BLOCKED** (dependency not done) or **READY** (eligible to run). Blocked tasks are never touched.
-
-### Phase 4 — Dispatch (Manager)
-For every READY task:
-1. Move it from `TODO.md` to `INPROGRESS.md` and stamp `Started: <ISO8601>`.
-2. Spawn an isolated subagent (Agent tool) with the exact task and verification statement.
-3. Tell the subagent: *"Self-verify your work. Return `RESULT: PASS|FAIL` and `EVIDENCE: <proof>`."*
-4. Independent tasks are batched in a single message so they run in parallel.
-
-### Phase 5 — Dual-Gate Audit (Auditor)
-The supervisor does **not** trust the subagent. It re-runs the verification itself.
-
-| Gate 1 | Gate 2 | Action |
-|--------|--------|--------|
-| FAIL   | (skip) | Stay in INPROGRESS, append `Fail Reason: gate-1 — ...` |
-| PASS   | FAIL   | Stay in INPROGRESS, append `Fail Reason: gate-2 — ...` |
-| PASS   | PASS   | Move to DONE, run `git commit` |
-
-### Phase 6 — Tick Summary (Reporter)
-Prints a one-line dashboard to stdout:
+The whole system in one diagram:
 
 ```
-── Tick @ 2026-06-17T12:34:56Z ──
-  Promoted: 2  In Progress: 1  Blocked: 3  Recovered: 0
+   ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+   │   TODO.md   │ -> │ INPROGRESS   │ -> │   DONE.md   │
+   │  backlog    │    │  + timer     │    │ + git comm. │
+   └─────────────┘    └──────────────┘    └─────────────┘
+           ^                  |                  |
+           |    15m stale     |    Gate 1 + 2    |
+           +------------------+------------------+
+                  (auto-retry)        (auto-verify)
+                            |
+                            v
+                     QUARANTINED.md
+                  (terminal failure, needs human)
 ```
+
+### The 3-file Kanban
+
+| File | Owned by | Purpose |
+|------|----------|---------|
+| `TODO.md` | you | Pending tasks with `Task:`, `Verification:`, `Depends On:` |
+| `INPROGRESS.md` | supervisor | Active tasks with `Started:` timestamp |
+| `DONE.md` | supervisor | Verified, git-committed tasks (append-only) |
+| `QUARANTINED.md` | supervisor | Terminal failure state, never re-dispatched |
+
+The supervisor reads `TODO.md` and `DONE.md` to compute the dependency graph. It moves tasks through the states itself. You only edit `TODO.md` (input) and `QUARANTINED.md` (recovery).
+
+### One tick = 6 phases
+
+Every 2 minutes, `/loop-tasks` runs these in order:
+
+1. **Stale Recovery (Janitor)** — sweep `INPROGRESS.md`. Any task older than 15 minutes gets yanked back to `TODO.md` as `[RETRY]`. Crashed subagents are healed automatically.
+2. **Load State** — read all four state files + `git log` for context hydration.
+3. **Classify (Strategist)** — label each task BLOCKED (deps not done), THROTTLED (failed in last 2 ticks), or READY.
+4. **Dispatch with Inner Loop (Manager)** — for each READY task: move to `INPROGRESS.md`, spawn isolated subagent, retry indefinitely within this tick until Gate 2 passes.
+5. **Dual-Gate Audit (Auditor)** — subagent self-verifies (Gate 1). Supervisor re-runs the verification itself (Gate 2). Both must pass. If Gate 2 fails, the task re-enters the inner loop with the failure as context.
+6. **Tick Summary (Reporter)** — print one block to stdout. Numbers only.
+
+### Why two gates?
+
+A subagent can hallucinate success, skip verification, or misinterpret the task. Gate 2 is the supervisor independently re-running the verification with its own tools. Both must agree, and Gate 2 has the final word. The cost is a second execution; the benefit is the difference between "shipped verified work" and "shipped plausible work."
+
+### Inner loop (continuation agents)
+
+When a subagent fails, the supervisor does NOT kick the task back to the backlog for a fresh start. It spawns a **continuation agent** with:
+- The full task description and verification.
+- The previous attempt's failure evidence.
+- The previous attempt's edits still in the working tree (`git diff`).
+- An explicit warning: do not recreate files, apply targeted patches.
+
+This means a task that fails on attempt 2 doesn't pay the cost of a new subagent discovering the codebase from scratch, or losing partial work. Each retry builds on the prior attempt's state.
+
+Tasks that pass first try go straight through with no spawn overhead.
+
+### Context hydration
+
+Each subagent gets scoped context — recent commits and diffs filtered to the file paths mentioned in the task. Tasks with no path hints hydrate from the whole repo (use sparingly on large repos).
+
+### What's not here
+
+Deliberately omitted:
+- Inter-subagent communication (subagents see only their own task; findings land on the filesystem)
+- An automatic improver (you watch tick summaries and tune verifications over time)
+- Cross-task learning (each tick is stateless — same instructions, fresh read)
+- True parallelism (Agent calls run sequentially in batch; real parallelism needs separate sessions)
 
 ---
 
 ## Task schema
 
-Every task in `TODO.md` must follow this format exactly. The supervisor parses it line-by-line — sloppy formatting breaks the pipeline.
+Every task in `TODO.md` must follow this format exactly. The supervisor parses it line-by-line.
 
 ```markdown
 - [ ] Task: <short, imperative description>
-  Verification: <concrete, binary test — what command, file, or output proves success?>
-  Depends On: <none | exact Task: string of another task>
+  Verification: <concrete, binary test>            # optional if Verification-LLM present
+  Verification-LLM: <rubric for judgment>         # optional, for visual/architectural
+  MaxAttempts: <N>                                # optional cap; default is unlimited
+  Depends On: <none | exact Task: string>
 ```
 
 ### Good examples
@@ -246,36 +345,12 @@ Every task in `TODO.md` must follow this format exactly. The supervisor parses i
 
 ### Bad examples (will fail)
 
-```markdown
-# Don't:
-- "Make the login work"             # vague, not testable
-- "Verify the API looks good"        # subjective
-- Depends on the "Add endpoint" task  # doesn't match exact Task: string
-```
+- ❌ "Make the login work" — vague, not testable
+- ❌ "Verify the API looks good" — subjective
+- ❌ `Depends on the "Add endpoint" task` — must character-match the exact `Task:` string
+- ❌ `Verification: works correctly` — no command, no assertion
 
-The verification rule: if a human can't run a single bash command and get a pass/fail answer in 10 seconds, rewrite the verification.
-
----
-
-## Daily ops
-
-### Adding work
-Drop new tasks into `TODO.md` anytime. The loop picks them up on the next tick.
-
-### Watching the loop
-Read the Phase 6 summary printed in your terminal. If you see:
-- **Promoted: 0, Recovered: 0, In Progress: stuck** → a task is too big, split it
-- **Gate-2 failures repeat** → verification statement is ambiguous, rewrite it
-- **Blocked count not going down** → check `Depends On:` strings for typos
-
-### Reverting a bad commit
-```bash
-git reset --hard HEAD~1
-```
-The state files (`TODO.md`, `INPROGRESS.md`) will also roll back to the last verified state. Move the task back to `INPROGRESS.md` manually if you want to retry it.
-
-### Stopping the loop
-Press `Ctrl+C` in the terminal where `/loop` is running. State is on disk, so nothing is lost.
+**The verification rule:** if a human can't run a single bash command and get a pass/fail answer in 10 seconds, rewrite the verification.
 
 ---
 
@@ -286,44 +361,45 @@ LoopEngineering/
 ├── .claude/
 │   └── commands/
 │       └── loop-tasks.md     # the /loop-tasks slash command
+├── assets/
+│   ├── architecture.png      # tick-flow diagram
+│   ├── mockups/              # design references for visual tasks
+│   ├── baselines/            # visual regression baselines
+│   ├── references/           # reference screenshots
+│   └── brand/                # logos, brand assets
 ├── .gitignore                # OS/editor/build exclusions
+├── HOW-IT-WORKS.md           # technical deep-dive
 ├── PLAN.md                   # architecture + design rationale
+├── QUARANTINED.md            # terminal failure state
 ├── README.md                 # this file
 ├── TODO.md                   # pending tasks (your input)
 ├── INPROGRESS.md             # active tasks (supervisor-owned)
-└── DONE.md                   # verified completed tasks (auto-archived)
+└── DONE.md                   # verified completed tasks
 ```
 
 ---
 
 ## Configuration
 
-### Changing the tick interval
+**Tick interval:** `/loop 5m /loop-tasks` (5 min) or `/loop 30s /loop-tasks` (30s). Shorter = more responsive but more context churn. 2 min is the default.
 
-`/loop 5m /loop-tasks` — every 5 minutes
-`/loop 30s /loop-tasks` — every 30 seconds
+**Stale timeout:** edit `.claude/commands/loop-tasks.md`, find `> 15 minutes`, change it. Keep it well below the tick interval so the janitor runs at least once between starts.
 
-Trade-off: shorter = more responsive but more context churn. 2 minutes is a reasonable default.
+**Custom verification runners:** put any test command (pytest, jest, go test) directly in the `Verification:` line. The supervisor will execute it via `Bash` during Gate 2.
 
-### Changing the stale timeout
-
-Edit `.claude/commands/loop-tasks.md` and find `> 10 minutes`. Replace with your preferred timeout. Keep it well below the tick interval so the janitor runs at least once between starts.
-
-### Custom verification runners
-
-If your project uses a specific test runner (pytest, jest, go test, etc.), put the command directly in the `Verification:` line. The supervisor will execute it via `Bash` during Gate 2.
+**Stale timeout units:** the slash command uses minutes. The default is 15 — long enough for non-trivial tasks, short enough that a crashed subagent doesn't block the queue.
 
 ---
 
 ## Troubleshooting
 
 **`/loop-tasks` not in the slash menu**
-Check that `.claude/commands/loop-tasks.md` exists at the repo root and restart Claude Code.
+Check that `.claude/commands/loop-tasks.md` exists at the project root and restart Claude Code.
 
 **Tick runs but nothing happens**
-`TODO.md` is empty, or all tasks are BLOCKED. Check `Depends On:` strings.
+`TODO.md` is empty, or all tasks are BLOCKED. Check `Depends On:` strings for typos.
 
-**Tasks keep timing out at 10 minutes**
+**Tasks keep timing out at 15 minutes**
 Split them. Tasks that take longer than one tick to verify are too big.
 
 **Gate 2 keeps disagreeing with Gate 1**
@@ -332,123 +408,23 @@ Tighten the verification statement. The supervisor is doing its job.
 **`git commit` fails in Phase 5**
 Either the repo isn't a git repo (run `git init`), or there are no changes to commit. Both are non-fatal — the task is still moved to DONE.
 
+**Tasks keep cycling between [RETRY] and INPROGRESS**
+The verification statement is ambiguous. Read the fail reasons, tighten the verification, drop `MaxAttempts` to make the loop stop thrashing.
+
+**Subagent produced a huge dirty tree that blocks subsequent tasks**
+Run `git checkout -- <files>` or `git stash` to clean the working tree, then add `[RETRY]` to the task in `TODO.md` to force redispatch.
+
 ---
 
 ## Limitations
 
-1. **Subagent parallelism is fake.** Within a single Claude Code session, Agent calls run sequentially in a batch, not truly in parallel. True parallel execution requires separate shell-spawned Claude Code sessions.
+1. **Subagent parallelism is fake.** Within a single Claude Code session, Agent calls run sequentially in a batch. True parallel execution requires separate shell-spawned sessions.
 2. **No inter-subagent communication.** Subagents only see their own task. Findings must land on the filesystem.
 3. **Context drift over very long sessions.** Even with the structured phase model, multi-day sessions degrade. Restart Claude Code daily.
 4. **Verification is only as good as the statement.** Vague verifications pass on garbage work.
 5. **`/loop` expires after ~3 days.** Re-run `/loop 2m /loop-tasks` periodically to keep the factory running.
 
-See `PLAN.md` section 9 for the full list.
-
----
-
-## Inner loop (the "reprompt if wrong" mechanic)
-
-When a subagent's work fails Gate 1 or Gate 2, the supervisor does NOT kick the task back to the backlog for a fresh subagent on the next tick. Instead, it runs an **inner loop** within the same tick, retrying **indefinitely** until Gate 2 passes.
-
-Each retry spawns a **continuation agent** whose prompt carries:
-
-- The full task description and verification statement.
-- The previous attempt's failure evidence (Gate 1 or Gate 2 output).
-- The previous attempt's edits still in the working tree (`git diff`).
-- An explicit **dirty-tree warning**: do not recreate files, apply targeted patches.
-
-This means a task that fails on attempt 1 doesn't pay the full cost of:
-- A new tick of waiting
-- A new subagent discovering the codebase from scratch
-- Losing the partial work already in the working tree
-
-The inner loop only fires on failures. Tasks that pass first try go straight through with no spawn overhead.
-
-### It's a loop — it loops until done
-
-The default is **unlimited retries**. The system is called `/loop` for a reason: it loops. To stop a stuck task, press Ctrl+C in the terminal where `/loop` is running. State is on disk, so nothing is lost.
-
-### Opt-in cap with MaxAttempts: N
-
-Set `MaxAttempts: N` only when you need a hard ceiling:
-
-```markdown
-- [ ] Task: Wire up the Stripe webhook handler
-  Verification: `node scripts/test-webhook.js` exits 0
-  MaxAttempts: 8             # cap retries — webhook routing can flake
-  Depends On: none
-
-- [ ] Task: Format all TypeScript files with prettier
-  Verification: `npx prettier --check src/` exits 0
-  MaxAttempts: 3             # if it doesn't pass in 3 tries, the tool is broken, not the agent
-  Depends On: none
-```
-
-Use a cap when you suspect the task is structurally unsolvable (bad verification statement, missing dependency), when runaway token cost is unacceptable, or when the retry budget itself is part of the task semantics (e.g., "give the model exactly 3 tries to nail this tricky regex"). For everything else, leave it uncapped and let the loop do its thing.
-
-### Terminal failure: QUARANTINED.md
-
-When the inner loop exhausts an **explicit** `MaxAttempts` cap without passing both gates, the task is moved to `QUARANTINED.md` — a strictly terminal state. The supervisor will never re-dispatch a quarantined task. Recovery requires a human:
-
-1. Read the attempt history in `QUARANTINED.md` to diagnose.
-2. Clean the dirty working tree (`git checkout -- <files>` or `git stash`).
-3. Move the task back to `TODO.md` with a `[RETRY]` prefix and a possibly rewritten verification.
-4. Commit the recovery.
-
-Note: without an explicit `MaxAttempts: N`, tasks never reach `QUARANTINED.md` automatically — they retry forever. Quarantine is only reached when you've opted into a cap.
-
-See `QUARANTINED.md` for the full recovery procedure.
-
----
-
-## Multi-modal verification
-
-For visual or architectural work that a bash command can't capture (Linear-style UI components, WebGL shaders, design system conformance), use `Verification-LLM:` instead of `Verification:`:
-
-```markdown
-- [ ] Task: Refactor the dashboard sidebar
-  Verification-LLM: Diff must show: (1) 12px font with reduced contrast, (2) collapse-to-icon at <768px, (3) ARIA labels on all interactive elements. Reject if any check missing.
-  Depends On: none
-```
-
-At Gate 2 the supervisor spawns a read-only LLM judge subagent with the diff and the rubric, and demands `VERDICT: PASS|FAIL` with a citation. You can also combine both — bash first, LLM second — for tasks that need both runnable and judgment-based verification.
-
-LLM judgments cost more than bash. The tick summary reports how many LLM judgments ran that tick and warns above 5. Trust the schema, watch the budget.
-
----
-
-## Complex tickets: when to use GSD instead
-
-LoopEngineering is a **factory line for execution**. It assumes tasks are well-shaped: clear `Verification:`, concrete `Depends On:`, scope under 15 minutes.
-
-If you have an Epic like "Build user authentication," do NOT drop it into `TODO.md` and hope. The inner loop will quarantine it on attempt 3 with "task too vague."
-
-Instead, use a planner upstream:
-
-1. Run `/gsd:plan-phase <n>` — produces a roadmap of micro-tasks with dependencies.
-2. Translate those micro-tasks into LoopEngineering task blocks (each with `Verification:` and `Depends On:`).
-3. Drop them into `TODO.md` and start `/loop 2m /loop-tasks`.
-
-LoopEngineering handles the execution queue. External planners handle decomposition. Keep the architecture strictly bounded to execution.
-
----
-
-## File layout (updated)
-
-```
-LoopEngineering/
-├── .claude/
-│   └── commands/
-│       └── loop-tasks.md     # the /loop-tasks slash command (with inner loop)
-├── .gitignore                # OS/editor/build exclusions
-├── HOW-IT-WORKS.md           # technical deep-dive of the system
-├── PLAN.md                   # architecture + design rationale
-├── QUARANTINED.md            # terminal failure state (supervisor-owned)
-├── README.md                 # this file
-├── TODO.md                   # pending tasks (your input)
-├── INPROGRESS.md             # active tasks (supervisor-owned)
-└── DONE.md                   # verified completed tasks (auto-archived)
-```
+See `HOW-IT-WORKS.md` for the full technical deep-dive and `PLAN.md` for the design rationale.
 
 ---
 
