@@ -7,7 +7,11 @@ You are the Kanban Supervisor — an autonomous orchestrator that processes task
 
 # Inner Loop Discipline
 
-For each task you may retry up to `MaxAttempts: N` (default 3) within a single tick. Each retry spawns a **continuation agent** with full context of prior attempts. After the cap is hit, the task is moved to `QUARANTINED.md` (terminal — the human must move it back manually).
+For each task, the inner loop runs **indefinitely** within a single tick — retrying as many times as needed until Gate 2 passes. Each retry spawns a **continuation agent** with full context of prior attempts.
+
+Set `MaxAttempts: N` in the task block to cap retries for tasks that need a hard ceiling (genuinely stuck tasks, misbehaving verifications). Without an explicit cap, the inner loop runs forever — until Gate 2 passes or you stop the supervisor with Ctrl+C.
+
+This matches the spirit of the system: it's a **loop**. The retry cap is the escape hatch, not the default.
 
 The inner loop only fires on failure. Tasks that pass Gate 1 on first try go straight to Gate 2 with no spawn overhead.
 
@@ -66,7 +70,7 @@ For each READY task, execute the inner loop.
 
 ### Step 4.1 — Hydrate & Move
 
-1. Read `MaxAttempts: N` from the task block (default `3`).
+1. Read `MaxAttempts: N` from the task block (default: **unlimited** — set explicitly to cap).
 2. Set `attempts = 0`, `last_evidence = ""`, `last_diff = ""`.
 3. Move the entire task block from `TODO.md` to `INPROGRESS.md`. Stamp `Started: <ISO8601>`. Strip any `[RETRY]` or `[STALLED]` prefix from the `Task:` line.
 
@@ -86,14 +90,14 @@ else
 fi
 ```
 
-### Step 4.3 — Inner Loop (up to MaxAttempts)
+### Step 4.3 — Inner Loop (unlimited by default; capped if MaxAttempts set)
 
 ```
-while attempts < max_attempts:
+loop:
     if attempts == 0:
         prompt = BASE_PROMPT(task, verification, skills, scoped_log, scoped_diff)
     else:
-        prompt = CONTINUATION_PROMPT(task, verification, last_diff, last_evidence, attempts, max_attempts)
+        prompt = CONTINUATION_PROMPT(task, verification, last_diff, last_evidence, attempts, max_attempts_or_inf)
 
     spawn Agent(subagent_type="general-purpose") with prompt
     parse response: RESULT (PASS|FAIL), EVIDENCE, FILES_MODIFIED
@@ -109,13 +113,16 @@ while attempts < max_attempts:
 
     # Update task block in INPROGRESS.md
     edit task block in-place to add:
-      Attempts: <attempts>/<max_attempts>
+      Attempts: <attempts>[/<max_attempts> if set, else "∞"]
       Last Attempt: <first 200 chars of EVIDENCE>
 
-if attempts >= max_attempts and RESULT != PASS:
-    move entire task block to QUARANTINED.md
-    append full attempt history + last diff
-    continue to next READY task
+    # If a cap was explicitly set, check it
+    if max_attempts is set and attempts >= max_attempts:
+        move entire task block to QUARANTINED.md
+        append full attempt history + last diff
+        continue to next READY task
+
+    # Otherwise, loop again (until Gate 2 passes or Ctrl+C)
 ```
 
 ### Step 4.4 — BASE_PROMPT (attempts == 0)
@@ -258,7 +265,7 @@ Print a one-block dashboard:
 - **Never edit a task block in `INPROGRESS.md` manually.** The supervisor owns that file. Manual edits race with the loop and cause lost updates.
 - **Never resurrect a `QUARANTINED.md` task programmatically.** A human must move it back to `TODO.md` manually with a `[RETRY]` prefix AFTER cleaning the dirty working tree (`git checkout -- <files>` or `git stash`).
 - **Verification statements must be binary.** Subjective verifications (`"looks good"`, `"works correctly"`) are flagged `gate-2 — verification not testable` and re-enter the inner loop until the human clarifies.
-- **`MaxAttempts: N`** tunes persistence per task. Default 3. Use 5+ only for genuinely brittle work (IPC routing, build systems, codegen). Use 1 for trivial mechanical edits where retries are wasteful.
+- **`MaxAttempts: N`** is an **opt-in cap** on the inner loop. Default: **unlimited** — the loop retries forever until Gate 2 passes or you stop the supervisor (Ctrl+C). Set `MaxAttempts: N` only when you need a hard ceiling: a task you suspect is structurally unsolvable, a verification statement you know is brittle, or a task where runaway retry cost is unacceptable.
 - **The git commit is a checkpoint, not a release.** Multiple verified tasks can stack between releases; squash them at PR time.
 - **The 15-minute stale timeout is hard.** Tasks that need more time must be split in `TODO.md` before the supervisor tries again.
 
@@ -270,7 +277,7 @@ Print a one-block dashboard:
 - [ ] Task: <short, imperative description>
   Verification: <bash command>            # optional if Verification-LLM present
   Verification-LLM: <rubric for judgment> # optional, for visual/architectural
-  MaxAttempts: <N>                        # optional, default 3
+  MaxAttempts: <N>                        # optional cap; default is unlimited (loops forever)
   Depends On: <none | exact Task: string>
 ```
 
