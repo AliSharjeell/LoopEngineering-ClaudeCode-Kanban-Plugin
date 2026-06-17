@@ -18,6 +18,7 @@
 ### One tick, in detail
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': 'transparent', 'primaryColor': 'transparent', 'primaryTextColor': '#e6edf3', 'primaryBorderColor': '#6e7681', 'lineColor': '#8b949e', 'tertiaryColor': 'transparent', 'clusterBkg': 'transparent', 'clusterBorder': '#6e7681', 'edgeLabelBackground': 'transparent', 'mainBkg': 'transparent'}}}%%
 flowchart TD
     Tick(["Tick at every 2m"])
     Tick --> P1
@@ -77,9 +78,9 @@ flowchart TD
 
     Summary -.next tick.-> Tick
 
-    classDef terminal fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef success fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef phase fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
+    classDef terminal fill:none,stroke:#f87171,stroke-width:2px,color:#f87171
+    classDef success fill:none,stroke:#34d399,stroke-width:2px,color:#34d399
+    classDef phase fill:none,stroke:#60a5fa,stroke-width:1px,color:#93c5fd
     class Quarantine terminal
     class Done,Commit success
     class P1,P2,P3,P4,P5,P6 phase
