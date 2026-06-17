@@ -19,50 +19,50 @@
 
 ```mermaid
 flowchart TD
-    Tick([⏱️ Tick @ every 2m])
+    Tick(["Tick at every 2m"])
     Tick --> P1
 
-    subgraph P1[Phase 1 · Janitor]
-        Stale{Any task<br/>in INPROGRESS<br/>older than 15m?}
-        Stale -- yes --> Recover[Move back to TODO.md<br/>prefix `[STALLED]`<br/>reason: stale 15m timeout]
-        Stale -- no --> P2trigger[ ]
+    subgraph P1["Phase 1 - Janitor"]
+        Stale{"Any task in INPROGRESS<br/>older than 15m?"}
+        Stale -- yes --> Recover["Move back to TODO.md<br/>prefix STALLED<br/>reason: stale 15m timeout"]
+        Stale -- no --> P2trigger[" "]
         Recover --> P2trigger
     end
 
     P2trigger --> P2
 
-    subgraph P2[Phase 2 · Load + Hydrate]
-        Load[Read TODO / INPROGRESS / DONE / QUARANTINED<br/>+ git log + git diff<br/>+ .claude/skills/]
+    subgraph P2["Phase 2 - Load and Hydrate"]
+        Load["Read TODO / INPROGRESS / DONE / QUARANTINED<br/>plus git log and git diff<br/>plus .claude/skills/"]
     end
 
     P2 --> P3
 
-    subgraph P3[Phase 3 · Strategist]
-        Classify{Classify each<br/>TODO task}
-        Classify -- in QUARANTINED --> Skip1[Skip forever]
-        Classify -- Depends On<br/>not in DONE --> Skip2[BLOCKED · skip this tick]
-        Classify -- recent RETRY --> Skip3[THROTTLED · skip 2 ticks]
-        Classify -- otherwise --> Ready[READY]
+    subgraph P3["Phase 3 - Strategist"]
+        Classify{"Classify each<br/>TODO task"}
+        Classify -- "in QUARANTINED" --> Skip1["Skip forever"]
+        Classify -- "Depends On not in DONE" --> Skip2["BLOCKED - skip this tick"]
+        Classify -- "recent RETRY" --> Skip3["THROTTLED - skip 2 ticks"]
+        Classify -- "otherwise" --> Ready["READY"]
     end
 
     Ready --> P4
 
-    subgraph P4[Phase 4 · Inner Loop · Manager]
-        Move[Move TODO → INPROGRESS<br/>stamp Started: timestamp]
-        Move --> Spawn[Spawn isolated subagent<br/>BASE_PROMPT + scoped context]
-        Spawn --> SelfCheck{Gate 1<br/>subagent self-verify}
-        SelfCheck -- FAIL --> Continuation[Spawn CONTINUATION agent<br/>with prior diff + failure evidence<br/>do NOT recreate files]
-        Continuation --> Cap{MaxAttempts<br/>reached?}
-        Cap -- yes --> Quarantine[(QUARANTINED.md<br/>terminal · needs human)]
+    subgraph P4["Phase 4 - Inner Loop - Manager"]
+        Move["Move TODO to INPROGRESS<br/>stamp Started timestamp"]
+        Move --> Spawn["Spawn isolated subagent<br/>BASE_PROMPT plus scoped context"]
+        Spawn --> SelfCheck{"Gate 1<br/>subagent self-verify"}
+        SelfCheck -- FAIL --> Continuation["Spawn CONTINUATION agent<br/>with prior diff and failure evidence<br/>do NOT recreate files"]
+        Continuation --> Cap{"MaxAttempts<br/>reached?"}
+        Cap -- yes --> Quarantine[("QUARANTINED.md<br/>terminal - needs human")]
         Cap -- no --> SelfCheck
         SelfCheck -- PASS --> P5
     end
 
-    subgraph P5[Phase 5 · Auditor · Dual-Gate]
-        Gate2{Gate 2<br/>supervisor re-verifies<br/>via Bash and/or LLM judge}
+    subgraph P5["Phase 5 - Auditor - Dual-Gate"]
+        Gate2{"Gate 2<br/>supervisor re-verifies<br/>via Bash and/or LLM judge"}
         Gate2 -- FAIL --> Continuation
-        Gate2 -- PASS --> Commit[git commit ·<br/>chore agent: verified task]
-        Commit --> Done[(DONE.md)]
+        Gate2 -- PASS --> Commit["git commit<br/>chore agent: verified task"]
+        Commit --> Done[("DONE.md")]
     end
 
     Done --> P6
@@ -71,8 +71,8 @@ flowchart TD
     Skip2 --> P6
     Skip3 --> P6
 
-    subgraph P6[Phase 6 · Reporter]
-        Summary[Print tick summary:<br/>promoted · quarantined · in-progress<br/>blocked · recovered · backlog]
+    subgraph P6["Phase 6 - Reporter"]
+        Summary["Print tick summary:<br/>promoted, quarantined, in-progress,<br/>blocked, recovered, backlog"]
     end
 
     Summary -.next tick.-> Tick
