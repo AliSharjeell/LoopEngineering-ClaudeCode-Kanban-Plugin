@@ -1,4 +1,4 @@
-# LoopEngineering
+# Loop Engineering Claude Code Kanbaan Plugin
 
 ![LoopEngineering architecture: Claude Code session invokes a 6-phase supervisor every 2 minutes — Stale Recovery, Classification, Dispatch, Dual-Gate Audit, and Tick Summary](assets/architecture.png)
 An autonomous, self-healing Kanban loop for Claude Code. Drop tasks in markdown. Walk away. Watch verified work commit itself to git.
