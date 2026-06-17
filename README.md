@@ -66,6 +66,101 @@ That's it. Every two minutes, the supervisor wakes up, processes the backlog, ve
 
 ---
 
+## How to use
+
+A practical walkthrough for running the loop day to day.
+
+### First-time setup
+
+Once per project:
+
+```bash
+# 1. Copy this scaffold into your project root (or work in this repo)
+cp -r LoopEngineering/ /path/to/your/project/
+
+# 2. Initialize git (the safety net)
+cd /path/to/your/project
+git init
+git add .
+git commit -m "chore: add LoopEngineering scaffold"
+
+# 3. Open Claude Code in the project
+claude
+
+# 4. Type / in an empty prompt. Confirm /loop-tasks appears in the menu.
+```
+
+If `/loop-tasks` is not listed, check that `.claude/commands/loop-tasks.md` exists at the project root and restart Claude Code.
+
+### Your first tick
+
+Open `TODO.md` and add one task:
+
+```markdown
+- [ ] Task: Add a hello-world script
+  Verification: `node hello.js` prints `Hello, world!` to stdout and exits 0
+  Depends On: none
+```
+
+In your Claude Code terminal:
+
+```
+/loop 2m /loop-tasks
+```
+
+Wait two minutes. The supervisor will:
+
+1. Read `TODO.md` and find your task.
+2. Move it to `INPROGRESS.md` and stamp the start time.
+3. Spawn a subagent to write `hello.js`.
+4. Re-run `node hello.js` itself for Gate 2 verification.
+5. Move the task to `DONE.md` and commit to git.
+
+You will see a tick summary like this:
+
+```
+── Tick @ 2026-06-17T12:34:56Z ──
+  Promoted to DONE: 1
+  Still In Progress: 0
+  Blocked: 0
+  Recovered (stale): 0
+  Backlog: 0
+```
+
+### Reading the tick summary
+
+| Field | Meaning |
+|-------|---------|
+| `Promoted to DONE` | Tasks that passed both gates and are now in `DONE.md`. |
+| `Still In Progress` | Tasks a subagent is currently working on (or the supervisor is verifying). |
+| `Blocked` | Tasks whose `Depends On:` chain is not yet complete. The loop will not touch them. |
+| `Recovered (stale)` | Tasks that exceeded the 10-minute timeout and were sent back to `TODO.md` as `[RETRY]`. |
+| `Backlog` | Total tasks remaining in `TODO.md`. |
+
+### Common operations
+
+**Edit a task that is in progress:** don't. Move it back to `TODO.md` first (remove the `[RETRY]` prefix and `Fail Reason:` line), then edit it there.
+
+**Skip a task for now:** add `[SKIP]` to its first line. The supervisor will leave it alone. Remove `[SKIP]` when you want it picked up.
+
+**Force-retry a stuck task:** remove it from `INPROGRESS.md` and put it back at the top of `TODO.md` with the `[RETRY]` prefix removed.
+
+**Revert a bad commit:**
+```bash
+git reset --hard HEAD~1
+```
+The state files roll back too. Move the affected task back to `INPROGRESS.md` manually if you want to retry it.
+
+**Stop the loop:** press `Ctrl+C` in the terminal where `/loop` is running. State is on disk, so nothing is lost. Re-run `/loop 2m /loop-tasks` to resume.
+
+**Change the cadence:** `/loop 5m /loop-tasks` for every 5 minutes, `/loop 30s /loop-tasks` for every 30 seconds. Shorter intervals are more responsive but burn more context.
+
+### Adding more work
+
+Drop new tasks into `TODO.md` at any time. The loop picks them up on the next tick. Write each one with a concrete, testable `Verification:` — see the schema below for examples of good vs. bad verifications.
+
+---
+
 ## How it works
 
 Every 2 minutes the loop runs six phases, in order:
