@@ -17,6 +17,31 @@
 
 ---
 
+## About
+
+**LoopEngineering is a Claude Code plugin that turns `/loop` into an autonomous, self-healing task supervisor.**
+
+Drop a list of tasks into `TODO.md` — each with a description, a verification statement, and its dependencies — then run:
+
+```
+/loop 2m /loop-tasks
+```
+
+…and walk away. The plugin wakes up every 2 minutes, dispatches ready tasks to isolated subagents, verifies their work through two independent gates, commits verified tasks to git, and recovers automatically from any subagent that crashes or hangs.
+
+**What you get out of the box:**
+
+- A custom slash command (`/loop-tasks`) that runs the 6-phase supervisor
+- A strict markdown task schema (Task / Verification / Depends On)
+- A 3-file Kanban board on disk (TODO / INPROGRESS / DONE) — fully recoverable
+- A 10-minute stale-task recovery system — no more stuck queues
+- A dual-gate verification protocol — subagent self-check + supervisor re-check
+- Automatic git commits per verified task — your `git log` becomes the audit trail
+
+**Who it's for:** developers using Claude Code who want to batch up a list of work and let the agent grind through it without babysitting every step.
+
+---
+
 ## What it is
 
 LoopEngineering is a six-phase state machine wrapped around Claude Code's `/loop` command. It turns this:
