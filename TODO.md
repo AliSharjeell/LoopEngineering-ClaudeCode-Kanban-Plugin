@@ -23,7 +23,7 @@ Every task must follow this exact format. The supervisor parses line-by-line; sl
 | `Task:` | yes | Imperative description. The supervisor and subagent both see this verbatim. |
 | `Verification:` | one of these two required | Bash command the supervisor runs at Gate 2. Must exit 0 on success. |
 | `Verification-LLM:` | one of these two required | Rubric for an LLM judge subagent at Gate 2. Use for visual / architectural checks bash can't capture. |
-| `MaxAttempts:` | no (default 3) | Inner-loop retry cap. Set to 1 for trivial edits, 5+ for genuinely brittle work (IPC, codegen). |
+| `MaxAttempts:` | no (default unlimited) | **Opt-in cap** on the inner loop. Default is **unlimited** — the loop retries until Gate 2 passes or you stop the supervisor. Set explicitly only when you need a hard ceiling (suspected unsolvable task, runaway cost concern). |
 | `Depends On:` | no | Character-exact match of another task's `Task:` field. |
 
 At least one of `Verification:` or `Verification-LLM:` must be present. Tasks with neither are flagged `gate-2 — no verification specified` and re-enter the inner loop.
@@ -46,7 +46,6 @@ At least one of `Verification:` or `Verification-LLM:` must be present. Tasks wi
 
 - [ ] Task: Add a health-check section to the README
   Verification: The string `## Health check` appears in `README.md`
-  MaxAttempts: 1
   Depends On: Add a /health endpoint to the API server
 ```
 
