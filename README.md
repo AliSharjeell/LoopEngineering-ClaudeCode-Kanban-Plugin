@@ -348,7 +348,7 @@ See `PLAN.md` section 9 for the full list.
 
 ## Inner loop (the "reprompt if wrong" mechanic)
 
-When a subagent's work fails Gate 1 or Gate 2, the supervisor does NOT kick the task back to the backlog for a fresh subagent on the next tick. Instead, it runs an **inner loop** within the same tick, up to `MaxAttempts` times (default 3).
+When a subagent's work fails Gate 1 or Gate 2, the supervisor does NOT kick the task back to the backlog for a fresh subagent on the next tick. Instead, it runs an **inner loop** within the same tick, retrying **indefinitely** until Gate 2 passes.
 
 Each retry spawns a **continuation agent** whose prompt carries:
 
@@ -364,25 +364,38 @@ This means a task that fails on attempt 1 doesn't pay the full cost of:
 
 The inner loop only fires on failures. Tasks that pass first try go straight through with no spawn overhead.
 
-### Tuning MaxAttempts per task
+### It's a loop — it loops until done
+
+The default is **unlimited retries**. The system is called `/loop` for a reason: it loops. To stop a stuck task, press Ctrl+C in the terminal where `/loop` is running. State is on disk, so nothing is lost.
+
+### Opt-in cap with MaxAttempts: N
+
+Set `MaxAttempts: N` only when you need a hard ceiling:
 
 ```markdown
-- [ ] Task: Write Jest tests for the auth flow
-  Verification: `npx jest auth.test.js` exits 0
-  MaxAttempts: 5             # default would be 3
+- [ ] Task: Wire up the Stripe webhook handler
+  Verification: `node scripts/test-webhook.js` exits 0
+  MaxAttempts: 8             # cap retries — webhook routing can flake
+  Depends On: none
+
+- [ ] Task: Format all TypeScript files with prettier
+  Verification: `npx prettier --check src/` exits 0
+  MaxAttempts: 3             # if it doesn't pass in 3 tries, the tool is broken, not the agent
   Depends On: none
 ```
 
-Use 1 for trivial mechanical edits (renames, formatting). Use 5+ for genuinely brittle work — IPC routing, codegen, build-system tweaks where the model needs several tries to nail the syntax.
+Use a cap when you suspect the task is structurally unsolvable (bad verification statement, missing dependency), when runaway token cost is unacceptable, or when the retry budget itself is part of the task semantics (e.g., "give the model exactly 3 tries to nail this tricky regex"). For everything else, leave it uncapped and let the loop do its thing.
 
 ### Terminal failure: QUARANTINED.md
 
-When the inner loop exhausts `MaxAttempts` without passing both gates, the task is moved to `QUARANTINED.md` — a strictly terminal state. The supervisor will never re-dispatch a quarantined task. Recovery requires a human:
+When the inner loop exhausts an **explicit** `MaxAttempts` cap without passing both gates, the task is moved to `QUARANTINED.md` — a strictly terminal state. The supervisor will never re-dispatch a quarantined task. Recovery requires a human:
 
 1. Read the attempt history in `QUARANTINED.md` to diagnose.
 2. Clean the dirty working tree (`git checkout -- <files>` or `git stash`).
 3. Move the task back to `TODO.md` with a `[RETRY]` prefix and a possibly rewritten verification.
 4. Commit the recovery.
+
+Note: without an explicit `MaxAttempts: N`, tasks never reach `QUARANTINED.md` automatically — they retry forever. Quarantine is only reached when you've opted into a cap.
 
 See `QUARANTINED.md` for the full recovery procedure.
 
