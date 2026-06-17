@@ -53,11 +53,55 @@ DONE_EOF
 5. Clean up the temp clone:
    rm -rf /tmp/loop-engineering
 
-6. Verify with:
+6. Verify file install with:
    ls ~/.claude/commands/loop-tasks.md ~/.claude/skills/loop-tasks/SKILL.md
    ls "$PROJECT_DIR/.claude/commands/loop-tasks.md" "$PROJECT_DIR/TODO.md" "$PROJECT_DIR/INPROGRESS.md" "$PROJECT_DIR/DONE.md" "$PROJECT_DIR/QUARANTINED.md"
 
-After install, /loop-tasks works in every project. To update, re-run these steps. The current project at PROJECT_DIR is now ready — add tasks to PROJECT_DIR/TODO.md and run /loop 2m /loop-tasks from inside it.
+7. HUMAN-IN-THE-LOOP ONBOARDING — print this verbatim to me before doing anything else:
+
+   "Loop Engineering is installed. Quick primer before we start:
+
+    • GOOD tasks are atomic ('Add input validation to calculate() in utils.py'), have a binary Verification (a single bash command like `pytest tests/test_utils.py -q`), and finish in under ~15 minutes (the stale timeout).
+    • BAD tasks are vague ('make it better', 'refactor auth'), have subjective verification ('looks good', 'feels right'), or are too large for one tick — those will spin the loop forever or quarantine.
+    • You don't have to hand-edit TODO.md. Just say things like 'add a task to fix the null pointer in login.ts with verification `npm test -- login`' or 'add three tasks for the dark mode rollout, each with a Playwright screenshot check' — I'll write properly formatted blocks. If you describe a task vaguely, I will ask you for the missing Verification before writing it.
+    • Verifications come in two flavors that you can mix in the same task: `Verification:` (a bash CLI command — exit 0 = pass; the most reproducible kind, use for unit tests, type checks, lints, smoke scripts, `curl | jq`, etc.) and `Verification-LLM:` (a strict rubric a read-only LLM judge evaluates against the git diff or a screenshot). For UI work, use BOTH — both gates must pass."
+
+8. HUMAN-IN-THE-LOOP UI TOOLING — ask the user whether they want a visual verification tool wired up. Use the AskUserQuestion tool with these four options (do not assume — they pick):
+
+   Question: "Want me to set up a UI verification tool for visual tasks? (Most projects are fine with CLI-only — skip if you're working on backend / library / CLI / infra.)"
+   Header: "UI tooling"
+   Options:
+     • "cua-driver (desktop / Electron / native apps, Recommended for UI)" — cross-platform background computer-use automation, drives windows via the OS accessibility tree without stealing focus. Installed as an MCP server. I'll check if it's already registered; if not, I'll show you the install command and offer to register the MCP server in your Claude config (with your confirmation — I will not silently edit ~/.claude/settings.json).
+     • "Playwright (web apps)" — headless browser automation for Chromium/Firefox/WebKit with built-in screenshot diffing. I'll detect your package manager (pnpm/yarn/npm) and offer to run `<pm> add -D @playwright/test && npx playwright install` in the background.
+     • "OS-native screenshot only" — lightweight, zero-install fallback. I'll record the right capture command for your OS (`screencapture -x` on macOS, the cua-driver `screenshot` tool on Windows if available else PowerShell, `import -window root` on Linux/X11 — requires ImageMagick).
+     • "Skip — CLI/bash verifications only" — the safest default for backend/library/CLI projects. You can re-run this install prompt later if you change your mind.
+
+   Then act on the choice:
+     - cua-driver: check whether mcp__cua-computer-use__* tools are present. If yes, confirm "already wired up." If no, print the cua-driver install one-liner from https://github.com/trycua/cua and ask via AskUserQuestion ("Want me to run the install now?") — only run it if the user agrees.
+     - Playwright: detect package manager from lockfile (pnpm-lock.yaml → pnpm, yarn.lock → yarn, else npm). Ask ("Run `<pm> add -D @playwright/test && npx playwright install` now?") — if yes, run in background via Bash with run_in_background:true and surface the task ID.
+     - Screenshot-only: detect the OS, print the right capture command, and tell the user to use it inside `Verification:` blocks or via `Verification-LLM:` rubrics that reference the captured PNG.
+     - Skip: just confirm and move on.
+
+   Record the chosen UI tool inline in PROJECT_DIR/.loop-tasks-config.md so subsequent installs see it:
+     cat > "$PROJECT_DIR/.loop-tasks-config.md" <<CONFIG_EOF
+   # loop-tasks config (informational — the supervisor does not require this file)
+   UI Tool: <one of: cua-driver | playwright | screenshot | none>
+   Package Manager: <npm | pnpm | yarn | n/a>
+   Screenshot Command: <only if UI Tool == screenshot>
+   OS: <darwin | win32 | linux>
+   Initialized: <ISO8601 timestamp>
+   CONFIG_EOF
+
+9. Final message — print this verbatim:
+
+   "Three ways to start:
+    1. Tell me a task in natural language — 'add a task to fix the typo in README.md' — I'll write the block.
+    2. Edit TODO.md directly using the schema at the top of that file.
+    3. Run `/loop 2m /loop-tasks` when you have at least one task. Use 5m for active dev, 30m–1h for cheap background work.
+
+    The supervisor retries the inner loop until Verification passes (or MaxAttempts is hit, if you set one). Stop anytime with Ctrl+C — state is on disk, nothing is lost."
+
+After install, /loop-tasks works in every project. To update, re-run these steps. The current project at PROJECT_DIR is now ready — add tasks to PROJECT_DIR/TODO.md (or ask me to) and run /loop 2m /loop-tasks from inside it.
 ```
 
 ## What it does
