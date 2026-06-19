@@ -1,20 +1,20 @@
 # Quarantined Tasks
 
-> Tasks that exhausted their inner-loop retry budget (`MaxAttempts`) without passing both gates. **Terminal state** — the supervisor will NEVER re-dispatch a task listed here. A human must manually move a task back to `TODO.md` (with a `[RETRY]` prefix) after diagnosing and cleaning up the failure.
+> Tasks that a human has marked as terminal by moving them here. The inner loop runs forever on its own — it never auto-quarantines. **Terminal state** — the supervisor will NEVER re-dispatch a task listed here. A human must manually move a task back to `TODO.md` (with a `[RETRY]` prefix) after diagnosing and cleaning up the failure.
 
-This file is **owned by the supervisor**. Do not edit it directly to add tasks. To recover a task, follow the recovery procedure below.
+This file is **owned by humans, not the supervisor**. To recover a task, follow the recovery procedure below.
 
 ---
 
 ## Why this file exists
 
-When the inner loop in Phase 4 exhausts `MaxAttempts` (default 3) and the task still fails both Gate 1 (subagent self-verify) and Gate 2 (supervisor re-verify), continuing to retry would:
+The inner loop in Phase 4 runs indefinitely — it will retry the same task forever if Gate 2 keeps failing. Continuing that loop indefinitely would:
 
 1. Burn tokens on a task the model demonstrably cannot solve.
 2. Risk runaway retry loops that pollute the working tree.
 3. Mask structural problems (bad verification statement, impossible task, missing context).
 
-Routing the task here **forces a human pause**. Quarantine is the factory line's safety valve — the supervisor declares "I am stuck" and hands off cleanly.
+Quarantining is the human's safety valve — when you (the operator) decide the loop is stuck, you move the task here to declare "I'm done with this for now" and hand off cleanly to a future session.
 
 ---
 
@@ -25,7 +25,7 @@ Each quarantined task carries the full attempt history so a human can diagnose w
 ```markdown
 ## <Task: string>
 Quarantined: <ISO8601>
-Attempts: <N>/<max>
+Attempts: <N>
 Final Fail Reason: <gate-1 | gate-2> — <one-line reason>
 Verification: <the original verification statement>
 Verification-LLM: <if present>
@@ -71,7 +71,6 @@ To re-dispatch a quarantined task:
    - [ ] [RETRY] Task: <original Task: string, sans prefix>
      Verification: <possibly rewritten>
      Verification-LLM: <possibly rewritten>
-     MaxAttempts: <possibly increased, e.g., 5>
      Depends On: <unchanged>
      Fail Reason: <one-line summary of why the previous attempts failed>
    ```
