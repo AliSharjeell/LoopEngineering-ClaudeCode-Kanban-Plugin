@@ -86,7 +86,7 @@ flowchart TD
     class P1,P2,P3,P4,P5,P6 phase
 ```
 
-**Reading the diagram:** every tick is six phases in order. The inner loop inside Phase 4 + 5 is where most of the work happens — a task that fails Gate 1 or Gate 2 doesn't bounce back to the backlog. Instead the supervisor spawns a *continuation agent* with the previous attempt's git diff in the working tree, so the next attempt builds on prior work instead of starting from scratch. Tasks only hit `QUARANTINED.md` when you've explicitly set a `MaxAttempts:` cap and it's been exhausted; otherwise the inner loop runs until Gate 2 passes or you `Ctrl+C`.
+**Reading the diagram:** every tick is six phases in order. The inner loop inside Phase 4 + 5 is where most of the work happens — a task that fails Gate 1 or Gate 2 doesn't bounce back to the backlog. Instead the supervisor spawns a *continuation agent* with the previous attempt's git diff in the working tree, so the next attempt builds on prior work instead of starting from scratch. Tasks only hit `QUARANTINED.md` when you (the human) move them there — the supervisor otherwise runs the inner loop indefinitely until Gate 2 passes or you `Ctrl+C`.
 
 ---
 
@@ -319,29 +319,13 @@ For architectural or aesthetic work that bash can't capture, use `Verification-L
 
 You can combine both: a bash check **and** an LLM rubric. Both must pass.
 
-### Tasks that might loop forever (and how to cap them)
+### Tasks that loop forever (by design)
 
-The default is **unlimited retries**. If Gate 2 fails, the supervisor retries within the same tick — over and over, until it passes or you `Ctrl+C`. The dirty working tree is preserved across attempts so a continuation agent can build on prior work instead of starting from scratch.
-
-Set `MaxAttempts: N` only when you need a hard ceiling:
-
-```markdown
-- [ ] Task: Wire up the Stripe webhook handler
-  Verification: `node scripts/test-webhook.js` exits 0
-  MaxAttempts: 8             # cap retries — webhook routing can flake
-  Depends On: none
-```
-
-Use a cap when:
-- You suspect the task is structurally unsolvable (bad verification, missing dep).
-- Runaway token cost is unacceptable.
-- The retry budget itself is part of the semantics ("give the model exactly 3 tries").
-
-For everything else, leave it uncapped. It loops — that's the point.
+If Gate 2 fails, the supervisor retries within the same tick — over and over, until it passes or you `Ctrl+C`. The dirty working tree is preserved across attempts so a continuation agent can build on prior work instead of starting from scratch. This is the point of the loop: it loops infinitely until success or human intervention.
 
 ### Tasks that get stuck (quarantine)
 
-When a task exhausts its `MaxAttempts` cap without passing both gates, the supervisor moves it to `QUARANTINED.md` — a terminal state. The loop will never re-dispatch it.
+The supervisor never moves a task to `QUARANTINED.md` on its own — the inner loop runs forever. If you decide a task is structurally stuck (bad verification, missing dep, runaway cost), move the block from `INPROGRESS.md` to `QUARANTINED.md` yourself. The supervisor treats quarantined tasks as terminal and will never re-dispatch them.
 
 To recover a quarantined task:
 
