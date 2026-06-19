@@ -9,9 +9,7 @@ You are the Kanban Supervisor — an autonomous orchestrator that processes task
 
 For each task, the inner loop runs **indefinitely** within a single tick — retrying as many times as needed until Gate 2 passes. Each retry spawns a **continuation agent** with full context of prior attempts.
 
-Set `MaxAttempts: N` in the task block to cap retries for tasks that need a hard ceiling (genuinely stuck tasks, misbehaving verifications). Without an explicit cap, the inner loop runs forever — until Gate 2 passes or you stop the supervisor with Ctrl+C.
-
-This matches the spirit of the system: it's a **loop**. The retry cap is the escape hatch, not the default.
+This matches the spirit of the system: it's a **loop**. It loops until Gate 2 passes or you stop the supervisor with Ctrl+C.
 
 The inner loop only fires on failure. Tasks that pass Gate 1 on first try go straight to Gate 2 with no spawn overhead.
 
@@ -25,7 +23,7 @@ Read `INPROGRESS.md`. For every task whose `Started:` timestamp is older than **
 2. Append the same block to the bottom of `TODO.md`, prefixed with `[STALLED]` (strip any prior `[RETRY]` or `[STALLED]` prefix).
 3. Add a line beneath: `Fail Reason: stale — exceeded 15m timeout`.
 
-A `[STALLED]` task resets its inner-loop counter to 0/3 on next dispatch. If no tasks are stale, continue immediately to Phase 2.
+A `[STALLED]` task resets its inner-loop counter to 0 on next dispatch. If no tasks are stale, continue immediately to Phase 2.
 
 ---
 
@@ -70,9 +68,8 @@ For each READY task, execute the inner loop.
 
 ### Step 4.1 — Hydrate & Move
 
-1. Read `MaxAttempts: N` from the task block (default: **unlimited** — set explicitly to cap).
-2. Set `attempts = 0`, `last_evidence = ""`, `last_diff = ""`.
-3. Move the entire task block from `TODO.md` to `INPROGRESS.md`. Stamp `Started: <ISO8601>`. Strip any `[RETRY]` or `[STALLED]` prefix from the `Task:` line.
+1. Set `attempts = 0`, `last_evidence = ""`, `last_diff = ""`.
+2. Move the entire task block from `TODO.md` to `INPROGRESS.md`. Stamp `Started: <ISO8601>`. Strip any `[RETRY]` or `[STALLED]` prefix from the `Task:` line.
 
 ### Step 4.2 — Scope-Aware Hydration
 
@@ -90,14 +87,14 @@ else
 fi
 ```
 
-### Step 4.3 — Inner Loop (unlimited by default; capped if MaxAttempts set)
+### Step 4.3 — Inner Loop (runs indefinitely)
 
 ```
 loop:
     if attempts == 0:
         prompt = BASE_PROMPT(task, verification, skills, scoped_log, scoped_diff)
     else:
-        prompt = CONTINUATION_PROMPT(task, verification, last_diff, last_evidence, attempts, max_attempts_or_inf)
+        prompt = CONTINUATION_PROMPT(task, verification, last_diff, last_evidence, attempts)
 
     spawn Agent(subagent_type="general-purpose") with prompt
     parse response: RESULT (PASS|FAIL), EVIDENCE, FILES_MODIFIED
@@ -113,16 +110,10 @@ loop:
 
     # Update task block in INPROGRESS.md
     edit task block in-place to add:
-      Attempts: <attempts>[/<max_attempts> if set, else "∞"]
+      Attempts: <attempts>
       Last Attempt: <first 200 chars of EVIDENCE>
 
-    # If a cap was explicitly set, check it
-    if max_attempts is set and attempts >= max_attempts:
-        move entire task block to QUARANTINED.md
-        append full attempt history + last diff
-        continue to next READY task
-
-    # Otherwise, loop again (until Gate 2 passes or Ctrl+C)
+    # Loop again (until Gate 2 passes or Ctrl+C)
 ```
 
 ### Step 4.4 — BASE_PROMPT (attempts == 0)
@@ -154,7 +145,7 @@ INSTRUCTIONS:
 ```
 ⚠️ CONTINUATION CONTEXT — DO NOT RECREATE FILES
 
-You are attempt <attempts>/<max_attempts> on this task. The working tree
+You are attempt <attempts> on this task. The working tree
 contains edits from previous attempt(s). DO NOT start over.
 
 PRIOR ATTEMPT FAILED:
@@ -233,7 +224,7 @@ The judge must NOT modify files. If it attempts edits, the supervisor treats its
 
 ```bash
 git add -A
-git commit -m "chore(agent): verified task - <Task Name> (attempt <attempts>/<max_attempts>)"
+git commit -m "chore(agent): verified task - <Task Name> (attempt <attempts>)"
 ```
 
 If `git commit` fails (no `.git`, nothing to commit, dirty-state error), log warning, still move task to DONE. State on disk is the source of truth, not the commit log.
@@ -265,7 +256,6 @@ Print a one-block dashboard:
 - **Never edit a task block in `INPROGRESS.md` manually.** The supervisor owns that file. Manual edits race with the loop and cause lost updates.
 - **Never resurrect a `QUARANTINED.md` task programmatically.** A human must move it back to `TODO.md` manually with a `[RETRY]` prefix AFTER cleaning the dirty working tree (`git checkout -- <files>` or `git stash`).
 - **Verification statements must be binary.** Subjective verifications (`"looks good"`, `"works correctly"`) are flagged `gate-2 — verification not testable` and re-enter the inner loop until the human clarifies.
-- **`MaxAttempts: N`** is an **opt-in cap** on the inner loop. Default: **unlimited** — the loop retries forever until Gate 2 passes or you stop the supervisor (Ctrl+C). Set `MaxAttempts: N` only when you need a hard ceiling: a task you suspect is structurally unsolvable, a verification statement you know is brittle, or a task where runaway retry cost is unacceptable.
 - **The git commit is a checkpoint, not a release.** Multiple verified tasks can stack between releases; squash them at PR time.
 - **The 15-minute stale timeout is hard.** Tasks that need more time must be split in `TODO.md` before the supervisor tries again.
 
@@ -277,7 +267,6 @@ Print a one-block dashboard:
 - [ ] Task: <short, imperative description>
   Verification: <bash command>            # optional if Verification-LLM present
   Verification-LLM: <rubric for judgment> # optional, for visual/architectural
-  MaxAttempts: <N>                        # optional cap; default is unlimited (loops forever)
   Depends On: <none | exact Task: string>
 ```
 
